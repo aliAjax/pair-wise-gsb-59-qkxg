@@ -31,6 +31,12 @@
       <span>未完成澄清</span>
       <strong class="danger">{{ pendingClarifications().length }}</strong>
     </article>
+    <article>
+      <span>补充材料待重评缺口</span>
+      <strong [class.danger]="coverageGapCount() > 0">
+        {{ coverageGapCount() }}
+      </strong>
+    </article>
   </div>
 
   <div class="review-grid">
@@ -122,6 +128,75 @@
     </aside>
   </div>
 
+  <section class="data-panel coverage-panel">
+    <div class="data-panel-header">
+      <div>
+        <h3>补充材料重新评审覆盖</h3>
+        <p>
+          每次补充回复都重新触发评审：旧意见保留在历史记录中，需两位不同评审员针对新回复分别出具意见，未齐前不能定稿。
+        </p>
+      </div>
+      <p-tag
+        [value]="uncoveredCoverage().length + ' 项待覆盖 · 缺 ' + coverageGapCount() + ' 份意见'"
+        [severity]="coverageGapCount() > 0 ? 'danger' : 'success'"
+      />
+    </div>
+    @if (supplementaryCoverage().length) {
+      <p-table [value]="supplementaryCoverage()" responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr>
+            <th>条款</th>
+            <th>供应商响应</th>
+            <th>当前轮次</th>
+            <th>已覆盖评审员</th>
+            <th>意见缺口</th>
+            <th>定稿状态</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-item>
+          <tr [class.row-blocked]="item.gap > 0">
+            <td>
+              <span class="mono">{{ item.clause.code }}</span>
+              <div class="table-primary">{{ item.clause.title }}</div>
+            </td>
+            <td>
+              {{ item.response.supplierName }}
+              <div class="table-secondary">{{ item.response.id }}</div>
+            </td>
+            <td>第 {{ item.round }} 轮</td>
+            <td>
+              @if (item.reviewers.length) {
+                <div class="reviewer-tags">
+                  @for (reviewer of item.reviewers; track reviewer) {
+                    <p-tag [value]="reviewer" severity="success" />
+                  }
+                </div>
+              } @else {
+                <span class="table-secondary">尚无当前轮意见</span>
+              }
+            </td>
+            <td>
+              @if (item.gap > 0) {
+                <strong class="danger">缺 {{ item.gap }} 份</strong>
+              } @else {
+                <span>已齐</span>
+              }
+            </td>
+            <td>
+              @if (item.gap > 0) {
+                <p-tag value="阻止定稿" severity="danger" />
+              } @else {
+                <p-tag value="允许覆盖" severity="success" />
+              }
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    } @else {
+      <p class="empty-copy">暂无供应商补充材料，响应沿用既有评审结论。</p>
+    }
+  </section>
+
   <section class="data-panel difference-panel">
     <div class="data-panel-header">
       <div>
@@ -155,7 +230,7 @@
           </td>
           <td>
             <div class="opinion-grid">
-              @for (review of item.response.reviews; track review.id) {
+              @for (review of currentRoundOpinions(item.response); track review.id) {
                 <div>
                   <strong>{{ review.reviewer }}</strong>
                   <app-status-tag [status]="review.decision" />
@@ -166,8 +241,12 @@
             </div>
           </td>
           <td>
-            {{ item.response.reviews[0]?.score ?? 0 }} -
-            {{ item.response.reviews[item.response.reviews.length - 1]?.score ?? 0 }}
+            {{ currentRoundOpinions(item.response)[0]?.score ?? 0 }} -
+            {{
+              currentRoundOpinions(
+                item.response
+              )[currentRoundOpinions(item.response).length - 1]?.score ?? 0
+            }}
           </td>
           <td>{{ item.response.attachmentName }}</td>
         </tr>
@@ -194,7 +273,7 @@
       />
     </div>
     <div class="finalize-note">
-      定稿前系统会检查未完成澄清。定稿后当前版本会生成内容哈希并锁定签署人。
+      定稿前系统会检查未完成澄清；供应商补充材料必须由两位不同评审员在当前轮分别重新出具意见，缺口为 {{ coverageGapCount() }} 份。定稿后当前版本会生成内容哈希并锁定签署人。
     </div>
     <div class="inline-actions dialog-actions">
       <p-button

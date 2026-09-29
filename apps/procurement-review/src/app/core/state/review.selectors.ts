@@ -4,6 +4,7 @@ import type {
   ClauseTreeNode,
   ComplianceStatus,
   ReviewState,
+  ReviewerOpinion,
   SupplierResponse,
 } from "../models/review.models";
 
@@ -72,12 +73,48 @@ export const selectToast = createSelector(
 
 export const hasReviewDifference = (response: SupplierResponse): boolean => {
   const decisions = new Set(
-    response.reviews
+    currentRoundReviews(response)
       .filter((review) => review.decision !== "clarification")
       .map((review) => review.decision),
   );
   return decisions.size > 1;
 };
+
+/** 供应商已登记过补充材料（已回复澄清）的响应。 */
+export const hasSupplementaryMaterial = (response: SupplierResponse): boolean =>
+  response.clarifications.some(
+    (clarification) => clarification.status === "responded",
+  );
+
+/** 针对当前评审轮次（最近一次补充回复之后）的意见；旧意见只留存在历史记录中。 */
+export const currentRoundReviews = (
+  response: SupplierResponse,
+): ReviewerOpinion[] =>
+  response.reviews.filter(
+    (review) => (review.reviewRound ?? 1) === response.reviewRound,
+  );
+
+/** 当前轮已经针对新回复出具意见的不同评审员数量。 */
+export const currentRoundReviewerCount = (response: SupplierResponse): number =>
+  new Set(currentRoundReviews(response).map((review) => review.reviewer)).size;
+
+/**
+ * 补充材料重新覆盖缺口：有补充材料的响应当前轮需要两位不同评审员，
+ * 返回尚缺的意见数量（0 表示已覆盖）；无补充材料的响应沿用现有处理。
+ */
+export const supplementaryCoverageGap = (response: SupplierResponse): number =>
+  hasSupplementaryMaterial(response)
+    ? Math.max(0, 2 - currentRoundReviewerCount(response))
+    : 0;
+
+export interface SupplementaryCoverageItem {
+  clause: Clause;
+  response: SupplierResponse;
+  round: number;
+  reviewerCount: number;
+  gap: number;
+  reviewers: string[];
+}
 
 export const findResponse = (
   clause: Clause,
@@ -192,6 +229,30 @@ export const selectPendingClarifications = createSelector(
     ),
 );
 
+export const selectSupplementaryCoverage = createSelector(
+  selectClauses,
+  (clauses): SupplementaryCoverageItem[] =>
+    clauses.flatMap((clause) =>
+      clause.responses
+        .map((response) => ({
+          clause,
+          response,
+          round: response.reviewRound,
+          reviewerCount: currentRoundReviewerCount(response),
+          gap: supplementaryCoverageGap(response),
+          reviewers: Array.from(
+            new Set(currentRoundReviews(response).map((review) => review.reviewer)),
+          ),
+        }))
+        .filter((item) => hasSupplementaryMaterial(item.response)),
+    ),
+);
+
+export const selectSupplementaryCoverageGapCount = createSelector(
+  selectSupplementaryCoverage,
+  (items) => items.reduce((total, item) => total + item.gap, 0),
+);
+
 export const selectReusedProofs = createSelector(
   selectClauses,
   (clauses) => {
@@ -215,4 +276,6 @@ export const selectReusedProofs = createSelector(
 export const responseDecisionSummary = (
   response: SupplierResponse,
 ): ComplianceStatus[] =>
-  Array.from(new Set(response.reviews.map((review) => review.decision)));
+  Array.from(
+    new Set(currentRoundReviews(response).map((review) => review.decision)),
+  );

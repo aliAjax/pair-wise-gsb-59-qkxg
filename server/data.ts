@@ -353,13 +353,17 @@ const makeResponse = (
     reviews: [],
     clarifications: [],
   };
+  base.clarifications = clarifications.filter((item) => item.responseId === id);
+  base.reviewRound =
+    1 +
+    base.clarifications.filter((item) => item.status === "responded").length;
   base.reviews = reviewFactories
     .filter((item) => item.responseId === id)
     .map((item, index) => ({
       id: `OP-${id}-${index + 1}`,
       ...item,
+      reviewRound: 1,
     }));
-  base.clarifications = clarifications.filter((item) => item.responseId === id);
   return base;
 };
 

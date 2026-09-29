@@ -208,6 +208,63 @@ h4 {
   }
 }
 
+.coverage-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid #f0c36a;
+  border-radius: 6px;
+  background: #fff8e8;
+  color: #744600;
+  font-size: 12.5px;
+  line-height: 1.6;
+
+  > i {
+    margin-top: 3px;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  strong {
+    font-weight: 600;
+  }
+
+  &.covered {
+    border-color: #8ac2a4;
+    background: #eef8f1;
+    color: #1f6b41;
+  }
+}
+
+.opinion-current {
+  border-color: #9cc7c4 !important;
+  background: #f2f9f8 !important;
+}
+
+.history-heading {
+  margin: 18px 0 8px;
+  color: #718188;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.history-list article {
+  opacity: 0.72;
+  background: #f6f8f8;
+}
+
+.round-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #e3eaec;
+  color: #5d6f75;
+  font-size: 11px;
+}
+
 .review-form {
   position: sticky;
   top: 92px;

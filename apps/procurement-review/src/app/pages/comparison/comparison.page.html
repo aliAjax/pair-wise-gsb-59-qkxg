@@ -144,7 +144,7 @@
                   <span class="attachment" [title]="response.attachmentName">
                     {{ response.attachmentName }}
                   </span>
-                  <small>{{ response.reviews.length }} 条独立意见</small>
+                  <small>{{ currentRoundOpinionCount(response) }} 条当前轮独立意见</small>
                 </div>
               } @else {
                 <span class="muted">无响应</span>

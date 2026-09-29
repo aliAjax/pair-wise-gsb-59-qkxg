@@ -18,6 +18,7 @@ import {
 } from "../../core/models/review.models";
 import { ReviewActions } from "../../core/state/review.actions";
 import {
+  currentRoundReviews,
   hasReviewDifference,
   selectClauses,
   selectFilteredClauses,
@@ -144,6 +145,10 @@ export class ComparisonPage {
 
   hasDifference(response: SupplierResponse | undefined): boolean {
     return response ? hasReviewDifference(response) : false;
+  }
+
+  currentRoundOpinionCount(response: SupplierResponse | undefined): number {
+    return response ? currentRoundReviews(response).length : 0;
   }
 
   isReusedProof(response: SupplierResponse | undefined): boolean {

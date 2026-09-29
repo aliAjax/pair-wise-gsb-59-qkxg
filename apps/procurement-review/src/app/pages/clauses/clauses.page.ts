@@ -36,9 +36,13 @@ import {
 } from "../../core/models/review.models";
 import { ReviewActions } from "../../core/state/review.actions";
 import {
+  currentRoundReviews,
+  currentRoundReviewerCount,
   hasReviewDifference,
+  hasSupplementaryMaterial,
   selectClauseTree,
   selectRole,
+  supplementaryCoverageGap,
 } from "../../core/state/review.selectors";
 import {
   ClarificationTagComponent,
@@ -105,6 +109,31 @@ export class ClausesPage {
     );
   });
   readonly canReview = computed(() => this.role() !== "procurement");
+  readonly currentRoundReviews = computed(() => {
+    const response = this.selectedResponse();
+    return response ? currentRoundReviews(response) : [];
+  });
+  readonly historicalReviews = computed(() => {
+    const response = this.selectedResponse();
+    if (!response) {
+      return [];
+    }
+    return response.reviews.filter(
+      (review) => (review.reviewRound ?? 1) < response.reviewRound,
+    );
+  });
+  readonly hasSupplementaryMaterial = computed(() => {
+    const response = this.selectedResponse();
+    return response ? hasSupplementaryMaterial(response) : false;
+  });
+  readonly currentRoundReviewerCount = computed(() => {
+    const response = this.selectedResponse();
+    return response ? currentRoundReviewerCount(response) : 0;
+  });
+  readonly coverageGap = computed(() => {
+    const response = this.selectedResponse();
+    return response ? supplementaryCoverageGap(response) : 0;
+  });
   readonly clauseRisks = computed(() => {
     const clause = this.selectedClause();
     if (!clause) {
@@ -253,8 +282,9 @@ export class ClausesPage {
     response: SupplierResponse,
     reviewer: string,
   ): string | undefined {
-    return response.reviews.find((review) => review.reviewer === reviewer)
-      ?.comment;
+    return currentRoundReviews(response).find(
+      (review) => review.reviewer === reviewer,
+    )?.comment;
   }
 
   private findClause(
@@ -286,9 +316,17 @@ export class ClausesPage {
     if (!response) {
       return;
     }
-    const latest = [...response.reviews].sort(
-      (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
-    )[0];
+    const currentReviewer = roleProfiles[this.role()].name;
+    const roundOpinions = currentRoundReviews(response);
+    const ownRoundOpinion = roundOpinions.find(
+      (review) => review.reviewer === currentReviewer,
+    );
+    // 有补充材料时，表单只能回填当前轮意见；旧轮次意见仅作为历史记录展示。
+    const latest =
+      ownRoundOpinion ??
+      [...roundOpinions].sort(
+        (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+      )[0];
     this.assessmentForm.reset({
       decision: latest?.decision ?? response.status,
       score: latest?.score ?? response.claimedScore,

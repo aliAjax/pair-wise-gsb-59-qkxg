@@ -131,10 +131,31 @@
                 </dl>
 
                 <h4>独立评审意见</h4>
-                @if (response.reviews.length) {
+                @if (hasSupplementaryMaterial()) {
+                  <div
+                    class="coverage-strip"
+                    [class.covered]="coverageGap() === 0"
+                  >
+                    <i
+                      [class.pi]="true"
+                      [class.pi-check-circle]="coverageGap() === 0"
+                      [class.pi-hourglass]="coverageGap() > 0"
+                    ></i>
+                    <p>
+                      供应商已补充材料并触发第 {{ response.reviewRound }} 轮重新评审，需两位不同评审员分别针对新回复出具意见；
+                      当前已有 {{ currentRoundReviewerCount() }} 位评审员覆盖，
+                      @if (coverageGap() > 0) {
+                        <strong>还差 {{ coverageGap() }} 份意见，未齐前不能定稿。</strong>
+                      } @else {
+                        <strong>当前轮覆盖已齐。</strong>
+                      }
+                    </p>
+                  </div>
+                }
+                @if (currentRoundReviews().length) {
                   <div class="opinion-list">
-                    @for (review of response.reviews; track review.id) {
-                      <article>
+                    @for (review of currentRoundReviews(); track review.id) {
+                      <article class="opinion-current">
                         <header>
                           <strong>{{ review.reviewer }}</strong>
                           <app-status-tag [status]="review.decision" />
@@ -148,7 +169,34 @@
                     }
                   </div>
                 } @else {
-                  <p class="muted">尚无独立评审意见。</p>
+                  <p class="muted">
+                    @if (hasSupplementaryMaterial()) {
+                      第 {{ response.reviewRound }} 轮尚无评审意见，请针对补充材料独立出具结论。
+                    } @else {
+                      尚无独立评审意见。
+                    }
+                  </p>
+                }
+                @if (historicalReviews().length) {
+                  <h5 class="history-heading">
+                    历史意见（第 1 至 {{ response.reviewRound - 1 }} 轮，已被补充材料触发的重新评审覆盖）
+                  </h5>
+                  <div class="opinion-list history-list">
+                    @for (review of historicalReviews(); track review.id) {
+                      <article>
+                        <header>
+                          <strong>{{ review.reviewer }}</strong>
+                          <app-status-tag [status]="review.decision" />
+                          @if (clause.type === "scoring") {
+                            <span>{{ review.score }} 分</span>
+                          }
+                          <span class="round-badge">第 {{ review.reviewRound }} 轮</span>
+                          <time>{{ review.createdAt | date: "MM-dd HH:mm" }}</time>
+                        </header>
+                        <p>{{ review.comment }}</p>
+                      </article>
+                    }
+                  </div>
                 }
 
                 <h4>澄清记录</h4>

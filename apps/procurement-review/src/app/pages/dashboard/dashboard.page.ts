@@ -13,7 +13,10 @@ import {
   type SupplierResponse,
 } from "../../core/models/review.models";
 import {
+  currentRoundReviews,
+  currentRoundReviewerCount,
   hasReviewDifference,
+  hasSupplementaryMaterial,
   selectAuditLogs,
   selectClauses,
   selectDashboard,
@@ -21,7 +24,10 @@ import {
   selectLoading,
   selectPendingClarifications,
   selectRole,
+  selectSupplementaryCoverage,
+  selectSupplementaryCoverageGapCount,
   selectVersions,
+  type SupplementaryCoverageItem,
 } from "../../core/state/review.selectors";
 import {
   ClarificationTagComponent,
@@ -78,6 +84,21 @@ export class DashboardPage {
     this.store.select(selectPendingClarifications),
     { initialValue: [] as PendingIssue[] },
   );
+  readonly supplementaryCoverage = toSignal(
+    this.store.select(selectSupplementaryCoverage),
+    { initialValue: [] as SupplementaryCoverageItem[] },
+  );
+  readonly coverageGapCount = toSignal(
+    this.store.select(selectSupplementaryCoverageGapCount),
+    { initialValue: 0 },
+  );
+  readonly uncoveredCoverage = computed(() =>
+    this.supplementaryCoverage().filter((item) => item.gap > 0),
+  );
+
+  currentRoundOpinions(response: SupplierResponse) {
+    return currentRoundReviews(response);
+  }
   readonly differences = computed(() =>
     this.clauses().flatMap((clause) =>
       clause.responses
@@ -103,8 +124,14 @@ export class DashboardPage {
     if (clauses.length === 0) {
       return 0;
     }
+    // 有补充材料的响应按当前轮独立评审员是否齐 2 人计算；
+    // 无补充材料的响应沿用“是否已有评审意见”的既有覆盖口径。
     const reviewed = clauses.filter((clause) =>
-      clause.responses.every((response) => response.reviews.length > 0),
+      clause.responses.every((response) =>
+        hasSupplementaryMaterial(response)
+          ? currentRoundReviewerCount(response) >= 2
+          : response.reviews.length > 0,
+      ),
     ).length;
     return Math.round((reviewed / clauses.length) * 100);
   });

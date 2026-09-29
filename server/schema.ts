@@ -55,6 +55,7 @@ export const typeDefs = parse(`
     score: Int!
     comment: String!
     createdAt: String!
+    reviewRound: Int!
   }
 
   type Clarification {

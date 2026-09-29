@@ -126,6 +126,20 @@
   }
 }
 
+.coverage-panel {
+  margin-top: 14px;
+}
+
+.reviewer-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+:host ::ng-deep .row-blocked td {
+  background: #fdf3f2;
+}
+
 .dialog-actions {
   justify-content: flex-end;
   margin-top: 18px;

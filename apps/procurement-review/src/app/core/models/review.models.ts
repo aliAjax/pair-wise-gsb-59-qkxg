@@ -21,6 +21,7 @@ export interface ReviewerOpinion {
   score: number;
   comment: string;
   createdAt: string;
+  reviewRound: number;
 }
 
 export interface Clarification {

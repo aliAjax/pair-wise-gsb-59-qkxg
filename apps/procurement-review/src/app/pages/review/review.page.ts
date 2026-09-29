@@ -23,11 +23,15 @@ import {
 } from "../../core/models/review.models";
 import { ReviewActions } from "../../core/state/review.actions";
 import {
+  currentRoundReviews,
   hasReviewDifference,
   selectClauses,
   selectPendingClarifications,
   selectRole,
+  selectSupplementaryCoverage,
+  selectSupplementaryCoverageGapCount,
   selectVersions,
+  type SupplementaryCoverageItem,
 } from "../../core/state/review.selectors";
 import {
   ClarificationTagComponent,
@@ -77,6 +81,20 @@ export class ReviewPage {
     this.store.select(selectPendingClarifications),
     { initialValue: [] as PendingClarification[] },
   );
+  readonly supplementaryCoverage = toSignal(
+    this.store.select(selectSupplementaryCoverage),
+    { initialValue: [] as SupplementaryCoverageItem[] },
+  );
+  readonly coverageGapCount = toSignal(
+    this.store.select(selectSupplementaryCoverageGapCount),
+    { initialValue: 0 },
+  );
+  readonly uncoveredCoverage = computed(() =>
+    this.supplementaryCoverage().filter((item) => item.gap > 0),
+  );
+  currentRoundOpinions(response: SupplierResponse) {
+    return currentRoundReviews(response);
+  }
   readonly finalizeVisible = signal(false);
   readonly responseVisible = signal(false);
   readonly selectedClarification = signal<PendingClarification | null>(null);

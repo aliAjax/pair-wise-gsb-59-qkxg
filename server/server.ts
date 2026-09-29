@@ -16,12 +16,35 @@ import type {
   FinalizeVersionInput,
   ReviewDatabase,
   ReviewRole,
+  ReviewerOpinion,
+  SupplierResponse,
 } from "./types";
+
+const hasSupplementaryMaterial = (response: SupplierResponse): boolean =>
+  response.clarifications.some(
+    (clarification) => clarification.status === "responded",
+  );
+
+const currentRoundReviews = (
+  response: SupplierResponse,
+): ReviewerOpinion[] =>
+  response.reviews.filter(
+    (review) => (review.reviewRound ?? 1) === response.reviewRound,
+  );
+
+const currentRoundReviewerCount = (response: SupplierResponse): number =>
+  new Set(currentRoundReviews(response).map((review) => review.reviewer)).size;
+
+/** 重新覆盖的意见缺口：有补充材料的响应，当前轮需要两位不同评审员。 */
+const supplementaryCoverageGap = (response: SupplierResponse): number =>
+  hasSupplementaryMaterial(response)
+    ? Math.max(0, 2 - currentRoundReviewerCount(response))
+    : 0;
 
 const getDashboard = (database: ReviewDatabase): DashboardStats => {
   const opinionsByResponse = database.responses.map((response) => {
     const decisions = new Set(
-      response.reviews
+      currentRoundReviews(response)
         .filter((review) => review.decision !== "clarification")
         .map((review) => review.decision),
     );
@@ -46,8 +69,10 @@ const getDashboard = (database: ReviewDatabase): DashboardStats => {
     mandatoryCount: database.clauses.filter(
       (clause) => clause.type === "mandatory",
     ).length,
-    pendingReviews: database.responses.filter(
-      (response) => response.reviews.length < 2,
+    pendingReviews: database.responses.filter((response) =>
+      hasSupplementaryMaterial(response)
+        ? currentRoundReviewerCount(response) < 2
+        : response.reviews.length < 2,
     ).length,
     differences: opinionsByResponse.filter(Boolean).length,
     overdueClarifications: database.responses.reduce(
@@ -130,6 +155,7 @@ const resolvers = {
           score: input.score,
           comment: input.comment.trim(),
           createdAt: new Date().toISOString(),
+          reviewRound: response.reviewRound,
         };
         response.reviews.push(opinion);
         response.status = input.decision;
@@ -139,7 +165,7 @@ const resolvers = {
           opinion.reviewer,
           "提交独立意见",
           response.id,
-          `${clause.code} ${clause.title} 判定为 ${input.decision}，评分 ${input.score}。`,
+          `${clause.code} ${clause.title} 第 ${response.reviewRound} 轮判定为 ${input.decision}，评分 ${input.score}。`,
         );
         return opinion;
       });
@@ -216,13 +242,20 @@ const resolvers = {
         );
         if (response) {
           response.status = "pending";
+          // 每次补充回复都重新触发评审覆盖：旧意见保留在历史记录中，
+          // 但不再计入当前轮，需要两位不同评审员针对新回复重新出具意见。
+          response.reviewRound =
+            1 +
+            response.clarifications.filter(
+              (item) => item.status === "responded",
+            ).length;
         }
         createAudit(
           database,
           input.actor,
           "回复澄清",
           clarification.id,
-          `第 ${clarification.round} 轮澄清已回复，等待评审员复核。`,
+          `第 ${clarification.round} 轮澄清已回复，进入第 ${response?.reviewRound ?? 1} 轮重新评审，原评审意见保留为历史记录。`,
         );
         return clarification;
       }),
@@ -245,6 +278,24 @@ const resolvers = {
         if (blockingClarifications.length > 0) {
           throw new Error(
             `仍有 ${blockingClarifications.length} 项未完成澄清，不能定稿。`,
+          );
+        }
+        const supplementedResponses = database.responses.filter(
+          hasSupplementaryMaterial,
+        );
+        const uncoveredResponses = supplementedResponses
+          .map((response) => ({
+            response,
+            gap: supplementaryCoverageGap(response),
+          }))
+          .filter((item) => item.gap > 0);
+        const coverageGapCount = uncoveredResponses.reduce(
+          (total, item) => total + item.gap,
+          0,
+        );
+        if (coverageGapCount > 0) {
+          throw new Error(
+            `${uncoveredResponses.length} 项供应商补充回复尚未完成重新评审，还差 ${coverageGapCount} 份不同评审员的独立意见，不能定稿。`,
           );
         }
         const maxVersion =

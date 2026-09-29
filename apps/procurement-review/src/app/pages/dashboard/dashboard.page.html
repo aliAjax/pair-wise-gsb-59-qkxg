@@ -151,7 +151,7 @@
               <td>{{ item.response.supplierName }}</td>
               <td>
                 <div class="tag-row">
-                  @for (review of item.response.reviews; track review.id) {
+                  @for (review of currentRoundOpinions(item.response); track review.id) {
                     <span class="review-score">
                       {{ review.reviewer }} · {{ review.score }} 分
                     </span>
@@ -192,6 +192,57 @@
         </ol>
       </section>
     </div>
+
+    <section class="data-panel clarification-panel">
+      <div class="data-panel-header">
+        <div>
+          <h3>补充材料重新评审覆盖</h3>
+          <p>每次补充回复都需两位不同评审员针对新回复分别出具意见，未齐前阻止定稿</p>
+        </div>
+        <p-tag
+          [value]="uncoveredCoverage().length + ' 项待覆盖 · 缺 ' + coverageGapCount() + ' 份'"
+          [severity]="coverageGapCount() > 0 ? 'danger' : 'success'"
+        />
+      </div>
+      <p-table
+        [value]="uncoveredCoverage()"
+        [paginator]="true"
+        [rows]="5"
+        responsiveLayout="scroll"
+        styleClass="compact-table"
+      >
+        <ng-template pTemplate="header">
+          <tr>
+            <th>条款</th>
+            <th>供应商</th>
+            <th>当前轮次</th>
+            <th>已覆盖评审员</th>
+            <th>意见缺口</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-item>
+          <tr>
+            <td>
+              <span class="mono">{{ item.clause.code }}</span>
+              <div class="table-secondary">{{ item.clause.title }}</div>
+            </td>
+            <td>{{ item.response.supplierName }}</td>
+            <td>第 {{ item.round }} 轮</td>
+            <td>
+              {{ item.reviewers.length ? item.reviewers.join("、") : "暂无" }}
+            </td>
+            <td>
+              <strong class="danger">缺 {{ item.gap }} 份不同评审员意见</strong>
+            </td>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="emptymessage">
+          <tr>
+            <td colspan="5">所有补充材料均已完成两位评审员的当前轮重新评审。</td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </section>
 
     <section class="data-panel clarification-panel">
       <div class="data-panel-header">

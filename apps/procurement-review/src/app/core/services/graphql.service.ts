@@ -48,6 +48,7 @@ const WORKSPACE_QUERY = gql`
             score
             comment
             createdAt
+            reviewRound
           }
           clarifications {
             id
@@ -111,6 +112,7 @@ const SUBMIT_ASSESSMENT = gql`
       score
       comment
       createdAt
+      reviewRound
     }
   }
 `;
