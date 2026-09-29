@@ -32,11 +32,18 @@ import {
   roleProfiles,
   type Clause,
   type ComplianceStatus,
+  type ReviewerOpinion,
   type SupplierResponse,
 } from "../../core/models/review.models";
 import { ReviewActions } from "../../core/state/review.actions";
 import {
+  REQUIRED_REVIEWERS,
+  currentRoundOpinions,
+  currentRoundReviewerNames,
+  hasCoverageGap,
   hasReviewDifference,
+  missingReviewSlots,
+  requiresRereview,
   selectClauseTree,
   selectRole,
 } from "../../core/state/review.selectors";
@@ -120,6 +127,13 @@ export class ClausesPage {
     if (clause.responses.some(hasReviewDifference)) {
       risks.push("不同评审员意见存在分歧，必须保留并进入小组复核");
     }
+    clause.responses.forEach((response) => {
+      if (hasCoverageGap(response)) {
+        risks.push(
+          `${response.supplierName}已补充材料，第 ${response.reviewRound} 轮仍缺 ${missingReviewSlots(response)} 份不同评审员意见，旧结论不再计入覆盖`,
+        );
+      }
+    });
     if (
       clause.responses.some((response) =>
         response.clarifications.some(
@@ -253,9 +267,34 @@ export class ClausesPage {
     response: SupplierResponse,
     reviewer: string,
   ): string | undefined {
-    return response.reviews.find((review) => review.reviewer === reviewer)
-      ?.comment;
+    return currentRoundOpinions(response).find(
+      (review) => review.reviewer === reviewer,
+    )?.comment;
   }
+
+  currentOpinions(response: SupplierResponse): ReviewerOpinion[] {
+    return currentRoundOpinions(response);
+  }
+
+  historicalOpinions(response: SupplierResponse): ReviewerOpinion[] {
+    return response.reviews.filter(
+      (review) => review.reviewRound !== response.reviewRound,
+    );
+  }
+
+  currentReviewerNames(response: SupplierResponse): string[] {
+    return currentRoundReviewerNames(response);
+  }
+
+  needsRereview(response: SupplierResponse): boolean {
+    return requiresRereview(response);
+  }
+
+  missingSlots(response: SupplierResponse): number {
+    return missingReviewSlots(response);
+  }
+
+  readonly requiredReviewers = REQUIRED_REVIEWERS;
 
   private findClause(
     nodes: readonly TreeNode<Clause>[],
@@ -286,7 +325,7 @@ export class ClausesPage {
     if (!response) {
       return;
     }
-    const latest = [...response.reviews].sort(
+    const latest = [...currentRoundOpinions(response)].sort(
       (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
     )[0];
     this.assessmentForm.reset({

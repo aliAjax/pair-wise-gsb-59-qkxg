@@ -61,14 +61,16 @@
         <div class="data-panel-header">
           <div>
             <h3>评审覆盖进度</h3>
-            <p>按每一条供应商响应是否已有独立意见计算</p>
+            <p>
+              按供应商响应计算；补充材料后的响应须由两位不同评审员重新出具意见
+            </p>
           </div>
           <strong>{{ completion() }}%</strong>
         </div>
         <div class="data-panel-body">
           <p-progressbar [value]="completion()" [showValue]="false" />
           <div class="progress-labels">
-            <span>已评审 {{ completion() }}%</span>
+            <span>已覆盖 {{ completion() }}%</span>
             <span>未完成 {{ 100 - completion() }}%</span>
           </div>
         </div>
@@ -192,6 +194,58 @@
         </ol>
       </section>
     </div>
+
+    <section class="data-panel clarification-panel">
+      <div class="data-panel-header">
+        <div>
+          <h3>补充材料复核缺口</h3>
+          <p>供应商补充后旧结论仅留档，须两位不同评审员重新出具意见，否则不能定稿</p>
+        </div>
+        <p-tag
+          [value]="coverageGaps().length + ' 项待复核 · 缺 ' + coverageMissingSlots() + ' 份'"
+          [severity]="coverageGaps().length ? 'danger' : 'success'"
+        />
+      </div>
+      <p-table
+        [value]="coverageGaps()"
+        [paginator]="true"
+        [rows]="5"
+        responsiveLayout="scroll"
+        styleClass="compact-table"
+      >
+        <ng-template pTemplate="header">
+          <tr>
+            <th>条款</th>
+            <th>供应商</th>
+            <th>评审轮次</th>
+            <th>本轮已评审</th>
+            <th>缺口</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-item>
+          <tr>
+            <td>
+              <span class="mono">{{ item.clause.code }}</span>
+              <div class="table-secondary">{{ item.clause.title }}</div>
+            </td>
+            <td>{{ item.response.supplierName }}</td>
+            <td>第 {{ item.round }} 轮</td>
+            <td>
+              {{ item.reviewerNames.length ? item.reviewerNames.join("、") : "暂无" }}
+            </td>
+            <td>
+              <app-status-tag [status]="item.response.status" />
+              <span class="gap-count">缺 {{ item.missing }} 份</span>
+            </td>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="emptymessage">
+          <tr>
+            <td colspan="5">补充材料均已完成双评审覆盖。</td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </section>
 
     <section class="data-panel clarification-panel">
       <div class="data-panel-header">

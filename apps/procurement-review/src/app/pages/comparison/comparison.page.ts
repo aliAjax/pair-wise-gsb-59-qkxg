@@ -18,6 +18,8 @@ import {
 } from "../../core/models/review.models";
 import { ReviewActions } from "../../core/state/review.actions";
 import {
+  currentRoundReviewerNames,
+  hasCoverageGap,
   hasReviewDifference,
   selectClauses,
   selectFilteredClauses,
@@ -144,6 +146,21 @@ export class ComparisonPage {
 
   hasDifference(response: SupplierResponse | undefined): boolean {
     return response ? hasReviewDifference(response) : false;
+  }
+
+  currentCoverageText(response: SupplierResponse | undefined): string {
+    if (!response) {
+      return "";
+    }
+    const names = currentRoundReviewerNames(response);
+    if (response.reviewRound > 1) {
+      return `第 ${response.reviewRound} 轮已覆盖 ${names.length}/2 位评审员`;
+    }
+    return `${response.reviews.length} 条独立意见`;
+  }
+
+  isCoverageGap(response: SupplierResponse | undefined): boolean {
+    return response ? hasCoverageGap(response) : false;
   }
 
   isReusedProof(response: SupplierResponse | undefined): boolean {

@@ -130,11 +130,52 @@
                   </div>
                 </dl>
 
+                @if (needsRereview(response)) {
+                  <div
+                    class="rereview-banner"
+                    [class.incomplete]="missingSlots(response) > 0"
+                    [class.complete]="missingSlots(response) === 0"
+                  >
+                    <i
+                      [class]="
+                        missingSlots(response) > 0
+                          ? 'pi pi-exclamation-circle'
+                          : 'pi pi-check-circle'
+                      "
+                    ></i>
+                    <div>
+                      <strong>
+                        供应商已补充材料，重新触发第 {{ response.reviewRound }}
+                        轮评审覆盖
+                      </strong>
+                      <p>
+                        旧意见保留在历史记录中，不计入本轮结论；需
+                        {{ requiredReviewers }}
+                        位不同评审员针对新回复分别给出意见，当前已有
+                        {{ currentReviewerNames(response).length }}
+                        位（{{
+                          currentReviewerNames(response).length
+                            ? currentReviewerNames(response).join("、")
+                            : "暂无"
+                        }}）
+                        @if (missingSlots(response) > 0) {
+                          ，尚缺 <b>{{ missingSlots(response) }}</b> 份，定稿将被阻止
+                        } @else {
+                          ，本轮覆盖已完成
+                        }
+                      </p>
+                    </div>
+                  </div>
+                }
+
                 <h4>独立评审意见</h4>
                 @if (response.reviews.length) {
                   <div class="opinion-list">
-                    @for (review of response.reviews; track review.id) {
-                      <article>
+                    @for (
+                      review of currentOpinions(response);
+                      track review.id
+                    ) {
+                      <article class="opinion-current">
                         <header>
                           <strong>{{ review.reviewer }}</strong>
                           <app-status-tag [status]="review.decision" />
@@ -142,9 +183,46 @@
                             <span>{{ review.score }} 分</span>
                           }
                           <time>{{ review.createdAt | date: "MM-dd HH:mm" }}</time>
+                          @if (needsRereview(response)) {
+                            <p-tag
+                              [value]="'第 ' + review.reviewRound + ' 轮'"
+                              severity="info"
+                            />
+                          }
                         </header>
                         <p>{{ review.comment }}</p>
                       </article>
+                    }
+                    @if (needsRereview(response) && missingSlots(response) > 0) {
+                      <p class="muted coverage-hint">
+                        还需 {{ missingSlots(response) }}
+                        位不同评审员针对本轮补充材料提交意见。
+                      </p>
+                    }
+                    @if (historicalOpinions(response).length) {
+                      <div class="opinion-history">
+                        <h5>历史意见（补充材料前，仅留档不计入覆盖）</h5>
+                        @for (
+                          review of historicalOpinions(response);
+                          track review.id
+                        ) {
+                          <article class="opinion-old">
+                            <header>
+                              <strong>{{ review.reviewer }}</strong>
+                              <app-status-tag [status]="review.decision" />
+                              @if (clause.type === "scoring") {
+                                <span>{{ review.score }} 分</span>
+                              }
+                              <time>{{ review.createdAt | date: "MM-dd HH:mm" }}</time>
+                              <p-tag
+                                [value]="'第 ' + review.reviewRound + ' 轮'"
+                                severity="secondary"
+                              />
+                            </header>
+                            <p>{{ review.comment }}</p>
+                          </article>
+                        }
+                      </div>
                     }
                   </div>
                 } @else {

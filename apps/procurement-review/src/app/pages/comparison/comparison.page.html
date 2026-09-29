@@ -144,7 +144,15 @@
                   <span class="attachment" [title]="response.attachmentName">
                     {{ response.attachmentName }}
                   </span>
-                  <small>{{ response.reviews.length }} 条独立意见</small>
+                  <small
+                    [class.coverage-gap]="isCoverageGap(response)"
+                  >{{ currentCoverageText(response) }}</small>
+                  @if (isCoverageGap(response)) {
+                    <small class="coverage-gap">
+                      <i class="pi pi-exclamation-circle"></i>
+                      补充材料待双评审覆盖，定稿将被阻止
+                    </small>
+                  }
                 </div>
               } @else {
                 <span class="muted">无响应</span>

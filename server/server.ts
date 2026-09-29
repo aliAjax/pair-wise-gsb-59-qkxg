@@ -16,12 +16,41 @@ import type {
   FinalizeVersionInput,
   ReviewDatabase,
   ReviewRole,
+  ReviewerOpinion,
+  SupplierResponse,
 } from "./types";
+
+/**
+ * 评审覆盖规则：
+ * - 供应商每补充一次材料（回复一次澄清），响应评审轮次推进一轮，旧意见仅留在历史记录。
+ * - 已收到补充材料（当前评审轮次 > 1）的响应，必须由两位不同评审员针对新回复分别给出意见。
+ * - 没有补充材料的响应沿用现有处理，不强制双评审覆盖。
+ */
+const REQUIRED_REVIEWERS = 2;
+
+const currentRoundOpinions = (
+  response: SupplierResponse,
+): ReviewerOpinion[] =>
+  response.reviews.filter(
+    (review) => review.reviewRound === response.reviewRound,
+  );
+
+const currentRoundReviewerNames = (response: SupplierResponse): string[] =>
+  Array.from(new Set(currentRoundOpinions(response).map((review) => review.reviewer)));
+
+const requiresRereview = (response: SupplierResponse): boolean =>
+  response.reviewRound > 1;
+
+const missingReviewSlots = (response: SupplierResponse): number =>
+  Math.max(0, REQUIRED_REVIEWERS - currentRoundReviewerNames(response).length);
+
+const hasCoverageGap = (response: SupplierResponse): boolean =>
+  requiresRereview(response) && missingReviewSlots(response) > 0;
 
 const getDashboard = (database: ReviewDatabase): DashboardStats => {
   const opinionsByResponse = database.responses.map((response) => {
     const decisions = new Set(
-      response.reviews
+      currentRoundOpinions(response)
         .filter((review) => review.decision !== "clarification")
         .map((review) => review.decision),
     );
@@ -47,7 +76,7 @@ const getDashboard = (database: ReviewDatabase): DashboardStats => {
       (clause) => clause.type === "mandatory",
     ).length,
     pendingReviews: database.responses.filter(
-      (response) => response.reviews.length < 2,
+      (response) => requiresRereview(response) && hasCoverageGap(response),
     ).length,
     differences: opinionsByResponse.filter(Boolean).length,
     overdueClarifications: database.responses.reduce(
@@ -121,15 +150,25 @@ const resolvers = {
         ) {
           throw new Error("评分项判定为符合时必须填写评分。");
         }
+        const reviewerName = input.reviewer.trim();
+        if (
+          requiresRereview(response) &&
+          currentRoundReviewerNames(response).includes(reviewerName)
+        ) {
+          throw new Error(
+            `第 ${response.reviewRound} 轮补充回复已收到 ${reviewerName} 的意见，必须由另一位评审员复核。`,
+          );
+        }
         const opinion = {
           id: createOpinionId(),
           responseId: response.id,
-          reviewer: input.reviewer.trim(),
+          reviewer: reviewerName,
           role: input.role,
           decision: input.decision,
           score: input.score,
           comment: input.comment.trim(),
           createdAt: new Date().toISOString(),
+          reviewRound: response.reviewRound,
         };
         response.reviews.push(opinion);
         response.status = input.decision;
@@ -139,7 +178,7 @@ const resolvers = {
           opinion.reviewer,
           "提交独立意见",
           response.id,
-          `${clause.code} ${clause.title} 判定为 ${input.decision}，评分 ${input.score}。`,
+          `${clause.code} ${clause.title} 第 ${response.reviewRound} 轮判定为 ${input.decision}，评分 ${input.score}。`,
         );
         return opinion;
       });
@@ -215,14 +254,20 @@ const resolvers = {
           (item) => item.id === clarification.responseId,
         );
         if (response) {
+          // 补充材料重新触发评审覆盖：轮次推进后，旧意见仅作为历史保留，
+          // 必须由两位不同评审员针对本轮新回复重新给出意见。
+          response.reviewRound += 1;
           response.status = "pending";
         }
+        const clause = response
+          ? database.clauses.find((item) => item.id === response.clauseId)
+          : undefined;
         createAudit(
           database,
           input.actor,
           "回复澄清",
           clarification.id,
-          `第 ${clarification.round} 轮澄清已回复，等待评审员复核。`,
+          `第 ${clarification.round} 轮澄清已回复，${clause ? `${clause.code} ` : ""}进入第 ${response?.reviewRound ?? 1} 轮双评审复核，历史意见保留。`,
         );
         return clarification;
       }),
@@ -245,6 +290,18 @@ const resolvers = {
         if (blockingClarifications.length > 0) {
           throw new Error(
             `仍有 ${blockingClarifications.length} 项未完成澄清，不能定稿。`,
+          );
+        }
+        const responsesAwaitingRereview = database.responses.filter(
+          hasCoverageGap,
+        );
+        if (responsesAwaitingRereview.length > 0) {
+          const missingSlots = responsesAwaitingRereview.reduce(
+            (total, response) => total + missingReviewSlots(response),
+            0,
+          );
+          throw new Error(
+            `有 ${responsesAwaitingRereview.length} 项供应商补充回复尚未完成双评审覆盖，仍缺 ${missingSlots} 份不同评审员的新意见，不能定稿。`,
           );
         }
         const maxVersion =

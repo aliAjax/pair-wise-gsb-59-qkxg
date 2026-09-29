@@ -3,7 +3,7 @@
     <div>
       <h2>评审版本与小组复核</h2>
       <p>
-        保留每位评审员的独立意见；分歧进入小组复核，已定稿版本不可覆盖。
+        保留每位评审员的独立意见；分歧进入小组复核，已定稿版本不可覆盖。供应商补充材料后必须重新完成双评审覆盖。
       </p>
     </div>
     <p-button
@@ -31,7 +31,63 @@
       <span>未完成澄清</span>
       <strong class="danger">{{ pendingClarifications().length }}</strong>
     </article>
+    <article>
+      <span>补充材料复核缺口</span>
+      <strong [class.danger]="coverageGaps().length > 0">
+        {{ coverageGaps().length }}
+      </strong>
+    </article>
   </div>
+
+  @if (coverageGaps().length) {
+    <section class="data-panel coverage-panel">
+      <div class="data-panel-header">
+        <div>
+          <h3>补充材料复核覆盖</h3>
+          <p>
+            以下响应已收到供应商补充回复，旧结论仅留档；必须由两位不同评审员针对新回复分别给出意见后方可定稿。
+          </p>
+        </div>
+        <p-tag
+          [value]="coverageGaps().length + ' 项待复核 · 缺 ' + coverageMissingSlots() + ' 份意见'"
+          severity="danger"
+        />
+      </div>
+      <p-table [value]="coverageGaps()" responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr>
+            <th>条款</th>
+            <th>供应商响应</th>
+            <th>评审轮次</th>
+            <th>本轮已评审</th>
+            <th>缺口</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-item>
+          <tr>
+            <td>
+              <span class="mono">{{ item.clause.code }}</span>
+              <div class="table-primary">{{ item.clause.title }}</div>
+            </td>
+            <td>
+              {{ item.response.supplierName }}
+              <div class="table-secondary">{{ item.response.id }}</div>
+            </td>
+            <td>第 {{ item.round }} 轮（补充材料后）</td>
+            <td>
+              {{ item.reviewerNames.length ? item.reviewerNames.join("、") : "暂无" }}
+            </td>
+            <td>
+              <p-tag
+                [value]="'缺 ' + item.missing + ' 份'"
+                severity="warn"
+              />
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </section>
+  }
 
   <div class="review-grid">
     <section class="data-panel versions-panel">
@@ -155,19 +211,41 @@
           </td>
           <td>
             <div class="opinion-grid">
-              @for (review of item.response.reviews; track review.id) {
+              @for (review of currentOpinions(item.response); track review.id) {
                 <div>
                   <strong>{{ review.reviewer }}</strong>
                   <app-status-tag [status]="review.decision" />
                   <span>{{ review.score }} 分</span>
+                  @if (item.response.reviewRound > 1) {
+                    <small class="round-note">第 {{ review.reviewRound }} 轮</small>
+                  }
                   <p>{{ review.comment }}</p>
+                </div>
+              }
+              @if (historicalOpinions(item.response).length) {
+                <div class="opinion-old">
+                  <small class="round-note">
+                    历史意见（第 {{ historicalOpinions(item.response)[0].reviewRound }}
+                    轮及以前，补充材料前，仅留档）
+                  </small>
+                  @for (
+                    review of historicalOpinions(item.response);
+                    track review.id
+                  ) {
+                    <div>
+                      <strong>{{ review.reviewer }}</strong>
+                      <app-status-tag [status]="review.decision" />
+                      <span>{{ review.score }} 分</span>
+                      <p>{{ review.comment }}</p>
+                    </div>
+                  }
                 </div>
               }
             </div>
           </td>
           <td>
-            {{ item.response.reviews[0]?.score ?? 0 }} -
-            {{ item.response.reviews[item.response.reviews.length - 1]?.score ?? 0 }}
+            {{ currentOpinions(item.response)[0]?.score ?? 0 }} -
+            {{ currentOpinions(item.response)[currentOpinions(item.response).length - 1]?.score ?? 0 }}
           </td>
           <td>{{ item.response.attachmentName }}</td>
         </tr>
@@ -193,8 +271,20 @@
         placeholder="例如：技术响应符合性评审汇总"
       />
     </div>
+    @if (coverageGaps().length) {
+      <div class="finalize-block">
+        <i class="pi pi-exclamation-triangle"></i>
+        <div>
+          <strong>定稿预检未通过</strong>
+          <p>
+            有 {{ coverageGaps().length }} 项供应商补充回复尚未完成双评审覆盖，仍缺
+            {{ coverageMissingSlots() }} 份不同评审员的新意见；旧结论仅保留在历史记录中。
+          </p>
+        </div>
+      </div>
+    }
     <div class="finalize-note">
-      定稿前系统会检查未完成澄清。定稿后当前版本会生成内容哈希并锁定签署人。
+      定稿前系统会检查未完成澄清，以及补充材料回复是否已由两位不同评审员重新出具意见。定稿后当前版本会生成内容哈希并锁定签署人。
     </div>
     <div class="inline-actions dialog-actions">
       <p-button

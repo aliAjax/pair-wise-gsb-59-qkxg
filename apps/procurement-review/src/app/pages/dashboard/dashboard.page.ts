@@ -13,6 +13,7 @@ import {
   type SupplierResponse,
 } from "../../core/models/review.models";
 import {
+  hasCoverageGap,
   hasReviewDifference,
   selectAuditLogs,
   selectClauses,
@@ -20,6 +21,7 @@ import {
   selectError,
   selectLoading,
   selectPendingClarifications,
+  selectReviewCoverageGaps,
   selectRole,
   selectVersions,
 } from "../../core/state/review.selectors";
@@ -78,6 +80,12 @@ export class DashboardPage {
     this.store.select(selectPendingClarifications),
     { initialValue: [] as PendingIssue[] },
   );
+  readonly coverageGaps = toSignal(this.store.select(selectReviewCoverageGaps), {
+    initialValue: [],
+  });
+  readonly coverageMissingSlots = computed(() =>
+    this.coverageGaps().reduce((total, item) => total + item.missing, 0),
+  );
   readonly differences = computed(() =>
     this.clauses().flatMap((clause) =>
       clause.responses
@@ -99,13 +107,14 @@ export class DashboardPage {
       ),
   );
   readonly completion = computed(() => {
-    const clauses = this.clauses();
-    if (clauses.length === 0) {
+    const allResponses = this.clauses().flatMap((clause) => clause.responses);
+    if (allResponses.length === 0) {
       return 0;
     }
-    const reviewed = clauses.filter((clause) =>
-      clause.responses.every((response) => response.reviews.length > 0),
+    // 补充材料后的响应必须完成双评审覆盖；其余响应沿用“至少一条意见”口径。
+    const reviewed = allResponses.filter(
+      (response) => !hasCoverageGap(response),
     ).length;
-    return Math.round((reviewed / clauses.length) * 100);
+    return Math.round((reviewed / allResponses.length) * 100);
   });
 }

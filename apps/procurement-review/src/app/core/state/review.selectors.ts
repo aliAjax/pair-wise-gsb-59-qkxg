@@ -4,8 +4,40 @@ import type {
   ClauseTreeNode,
   ComplianceStatus,
   ReviewState,
+  ReviewerOpinion,
   SupplierResponse,
 } from "../models/review.models";
+
+/**
+ * 评审覆盖规则：
+ * 供应商每补充一次材料（回复一次澄清），响应评审轮次推进一轮，旧意见仅留在历史记录。
+ * 当前轮次 > 1 的响应必须由两位不同评审员针对新回复分别给出意见；
+ * 没有补充材料的响应沿用现有处理，不强制双评审覆盖。
+ */
+export const REQUIRED_REVIEWERS = 2;
+
+export const currentRoundOpinions = (
+  response: SupplierResponse,
+): ReviewerOpinion[] =>
+  response.reviews.filter(
+    (review) => review.reviewRound === response.reviewRound,
+  );
+
+export const currentRoundReviewerNames = (
+  response: SupplierResponse,
+): string[] =>
+  Array.from(
+    new Set(currentRoundOpinions(response).map((review) => review.reviewer)),
+  );
+
+export const requiresRereview = (response: SupplierResponse): boolean =>
+  response.reviewRound > 1;
+
+export const missingReviewSlots = (response: SupplierResponse): number =>
+  Math.max(0, REQUIRED_REVIEWERS - currentRoundReviewerNames(response).length);
+
+export const hasCoverageGap = (response: SupplierResponse): boolean =>
+  requiresRereview(response) && missingReviewSlots(response) > 0;
 
 export const selectReviewState =
   createFeatureSelector<ReviewState>("review");
@@ -72,7 +104,7 @@ export const selectToast = createSelector(
 
 export const hasReviewDifference = (response: SupplierResponse): boolean => {
   const decisions = new Set(
-    response.reviews
+    currentRoundOpinions(response)
       .filter((review) => review.decision !== "clarification")
       .map((review) => review.decision),
   );
@@ -192,6 +224,30 @@ export const selectPendingClarifications = createSelector(
     ),
 );
 
+export interface ReviewCoverageGap {
+  clause: Clause;
+  response: SupplierResponse;
+  round: number;
+  reviewerNames: string[];
+  missing: number;
+}
+
+export const selectReviewCoverageGaps = createSelector(
+  selectClauses,
+  (clauses): ReviewCoverageGap[] =>
+    clauses.flatMap((clause) =>
+      clause.responses
+        .filter(hasCoverageGap)
+        .map((response) => ({
+          clause,
+          response,
+          round: response.reviewRound,
+          reviewerNames: currentRoundReviewerNames(response),
+          missing: missingReviewSlots(response),
+        })),
+    ),
+);
+
 export const selectReusedProofs = createSelector(
   selectClauses,
   (clauses) => {
@@ -215,4 +271,6 @@ export const selectReusedProofs = createSelector(
 export const responseDecisionSummary = (
   response: SupplierResponse,
 ): ComplianceStatus[] =>
-  Array.from(new Set(response.reviews.map((review) => review.decision)));
+  Array.from(
+    new Set(currentRoundOpinions(response).map((review) => review.decision)),
+  );

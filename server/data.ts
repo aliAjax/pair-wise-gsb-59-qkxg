@@ -358,8 +358,13 @@ const makeResponse = (
     .map((item, index) => ({
       id: `OP-${id}-${index + 1}`,
       ...item,
+      reviewRound: 1,
     }));
   base.clarifications = clarifications.filter((item) => item.responseId === id);
+  // 每收到一次供应商补充回复就推进评审轮次；初始为第 1 轮。
+  base.reviewRound =
+    1 +
+    base.clarifications.filter((item) => item.status === "responded").length;
   return base;
 };
 
@@ -439,6 +444,19 @@ const buildSeed = (): ReviewDatabase => ({
   suppliers: structuredClone(suppliers),
 });
 
+const normalizeDatabase = (database: ReviewDatabase): ReviewDatabase => {
+  database.responses.forEach((response) => {
+    response.reviewRound = Math.max(1, response.reviewRound ?? 1);
+    response.reviews.forEach((review) => {
+      review.reviewRound = Math.max(
+        1,
+        review.reviewRound ?? Math.min(response.reviewRound, 1),
+      );
+    });
+  });
+  return database;
+};
+
 class ReviewDataStore {
   private readonly runtimePath = join(process.cwd(), "server", "runtime-data.json");
   private data: ReviewDatabase;
@@ -446,9 +464,9 @@ class ReviewDataStore {
   constructor() {
     if (existsSync(this.runtimePath)) {
       try {
-        this.data = JSON.parse(
-          readFileSync(this.runtimePath, "utf8"),
-        ) as ReviewDatabase;
+        this.data = normalizeDatabase(
+          JSON.parse(readFileSync(this.runtimePath, "utf8")) as ReviewDatabase,
+        );
       } catch {
         this.data = buildSeed();
       }

@@ -93,7 +93,7 @@ export class ReviewEffects {
           map(({ workspace }) =>
             ReviewActions.loadReviewDataSuccess({
               workspace,
-              toast: "澄清回复已登记，等待评审员复核。",
+              toast: "澄清回复已登记，需两位不同评审员针对补充材料分别给出意见。",
             }),
           ),
           catchError((error: unknown) =>

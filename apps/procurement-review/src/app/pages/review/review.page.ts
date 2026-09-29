@@ -19,13 +19,16 @@ import {
   roleProfiles,
   type Clarification,
   type Clause,
+  type ReviewerOpinion,
   type SupplierResponse,
 } from "../../core/models/review.models";
 import { ReviewActions } from "../../core/state/review.actions";
 import {
+  currentRoundOpinions,
   hasReviewDifference,
   selectClauses,
   selectPendingClarifications,
+  selectReviewCoverageGaps,
   selectRole,
   selectVersions,
 } from "../../core/state/review.selectors";
@@ -76,6 +79,12 @@ export class ReviewPage {
   readonly pendingClarifications = toSignal(
     this.store.select(selectPendingClarifications),
     { initialValue: [] as PendingClarification[] },
+  );
+  readonly coverageGaps = toSignal(this.store.select(selectReviewCoverageGaps), {
+    initialValue: [],
+  });
+  readonly coverageMissingSlots = computed(() =>
+    this.coverageGaps().reduce((total, item) => total + item.missing, 0),
   );
   readonly finalizeVisible = signal(false);
   readonly responseVisible = signal(false);
@@ -134,6 +143,16 @@ export class ReviewPage {
     this.selectedClarification.set(item);
     this.responseForm.reset({ responseText: "" });
     this.responseVisible.set(true);
+  }
+
+  currentOpinions(response: SupplierResponse): ReviewerOpinion[] {
+    return currentRoundOpinions(response);
+  }
+
+  historicalOpinions(response: SupplierResponse): ReviewerOpinion[] {
+    return response.reviews.filter(
+      (review) => review.reviewRound !== response.reviewRound,
+    );
   }
 
   respondClarification(): void {

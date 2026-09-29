@@ -1,6 +1,6 @@
 .version-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
 
@@ -90,6 +90,11 @@
   text-align: center;
 }
 
+.coverage-panel {
+  margin-bottom: 16px;
+  border: 1px solid #ecc7c2;
+}
+
 .opinion-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 1fr));
@@ -123,6 +128,44 @@
     color: #536970;
     font-size: 12px;
     line-height: 1.5;
+  }
+
+  .round-note {
+    color: #4c7a86;
+    font-size: 11px;
+  }
+
+  .opinion-old {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 6px;
+    padding: 8px 9px;
+    border: 1px dashed #c3d0d4;
+    background: #f3f6f6;
+    opacity: 0.85;
+  }
+}
+
+.finalize-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 11px 12px;
+  border: 1px solid #ecc7c2;
+  border-radius: 6px;
+  background: #fdecea;
+  color: #8a2a20;
+  font-size: 12.5px;
+  line-height: 1.5;
+
+  strong {
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  p {
+    margin: 0;
   }
 }
 
@@ -174,5 +217,11 @@
 
   .opinion-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 1180px) {
+  .version-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
